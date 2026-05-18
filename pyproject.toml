@@ -43,6 +43,7 @@ cli = ["static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 addopts = "-ra --strict-markers"
 markers = [
     "unit: fast isolated unit tests",
