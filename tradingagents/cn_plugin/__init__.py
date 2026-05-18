@@ -28,3 +28,18 @@ for _method_name in list(VENDOR_METHODS.keys()):
 
 # 3. Patch routing for ticker normalization + china interception
 patch_routing()
+
+# 4. Patch get_language_instruction for Chinese enhancement
+from tradingagents.cn_plugin.prompts.zh_cn import ZH_INSTRUCTION
+import tradingagents.agents.utils.agent_utils as _agent_utils
+
+_original_get_language_instruction = _agent_utils.get_language_instruction
+
+def _zh_language_instruction() -> str:
+    from tradingagents.dataflows.config import get_config
+    lang = get_config().get("output_language", "English")
+    if lang.strip().lower() in ("chinese", "中文"):
+        return ZH_INSTRUCTION
+    return _original_get_language_instruction()
+
+_agent_utils.get_language_instruction = _zh_language_instruction
