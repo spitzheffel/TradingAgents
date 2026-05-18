@@ -65,5 +65,34 @@ def _stub_dataflows_vendors():
         sys.modules["tradingagents.dataflows.alpha_vantage_common"] = mod
 
 
+def _stub_langchain():
+    """Stub out langchain_core so cn_plugin/__init__.py can import agent_utils."""
+    if "langchain_core" not in sys.modules:
+        lc = types.ModuleType("langchain_core")
+        sys.modules["langchain_core"] = lc
+
+    if "langchain_core.messages" not in sys.modules:
+        msgs = types.ModuleType("langchain_core.messages")
+        msgs.HumanMessage = MagicMock
+        msgs.RemoveMessage = MagicMock
+        sys.modules["langchain_core.messages"] = msgs
+
+    # Stub the full agents.utils.agent_utils so cn_plugin/__init__.py can patch it
+    if "tradingagents.agents" not in sys.modules:
+        agents_pkg = types.ModuleType("tradingagents.agents")
+        sys.modules["tradingagents.agents"] = agents_pkg
+
+    if "tradingagents.agents.utils" not in sys.modules:
+        utils_pkg = types.ModuleType("tradingagents.agents.utils")
+        sys.modules["tradingagents.agents.utils"] = utils_pkg
+
+    if "tradingagents.agents.utils.agent_utils" not in sys.modules:
+        agent_utils = types.ModuleType("tradingagents.agents.utils.agent_utils")
+        agent_utils.get_language_instruction = lambda: "Respond in English."
+        agent_utils.create_msg_delete = MagicMock
+        sys.modules["tradingagents.agents.utils.agent_utils"] = agent_utils
+
+
 # Run at collection time so imports in test modules succeed
 _stub_dataflows_vendors()
+_stub_langchain()
