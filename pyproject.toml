@@ -32,6 +32,15 @@ dependencies = [
     "yfinance>=0.2.63",
 ]
 
+[project.optional-dependencies]
+cn = [
+    "tushare>=1.4.2",
+    "akshare>=1.14.0",
+    "baostock>=0.8.8",
+    "psycopg[binary]>=3.2.0",
+    "psycopg-pool>=3.2.0",
+]
+
 [project.scripts]
 tradingagents = "cli.main:app"
 
