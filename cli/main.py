@@ -21,6 +21,12 @@ from rich.align import Align
 from rich.rule import Rule
 
 from tradingagents.graph.trading_graph import TradingAgentsGraph
+
+# Activate CN plugin if [cn] extras are installed
+try:
+    import tradingagents.cn_plugin  # noqa: F401
+except ImportError:
+    pass
 from tradingagents.graph.analyst_execution import (
     AnalystWallTimeTracker,
     build_analyst_execution_plan,
@@ -1281,6 +1287,75 @@ def analyze(
         n = clear_all_checkpoints(DEFAULT_CONFIG["data_cache_dir"])
         console.print(f"[yellow]Cleared {n} checkpoint(s).[/yellow]")
     run_analysis(checkpoint=checkpoint)
+
+
+@app.command()
+def batch(
+    tickers: str = typer.Option(
+        ...,
+        "--tickers",
+        "-t",
+        help="Comma-separated ticker list (e.g. '600519.SH,000858.SZ') or path to a text file with one ticker per line.",
+    ),
+    date: str = typer.Option(
+        None,
+        "--date",
+        "-d",
+        help="Analysis date in YYYY-MM-DD format. Defaults to today.",
+    ),
+    concurrency: int = typer.Option(
+        2,
+        "--concurrency",
+        "-c",
+        help="Max concurrent analyses.",
+    ),
+    output_dir: Optional[str] = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Directory to save reports. Defaults to results_dir.",
+    ),
+):
+    """Run batch analysis for multiple tickers."""
+    try:
+        from tradingagents.cn_plugin.batch.runner import run_batch_sync, generate_summary_report
+    except ImportError:
+        console.print("[red]Batch analysis requires the CN plugin. Install with: pip install -e '.[cn]'[/red]")
+        raise typer.Exit(1)
+
+    import datetime as dt
+
+    # Parse tickers
+    from pathlib import Path as P
+    if P(tickers).is_file():
+        ticker_list = [line.strip() for line in P(tickers).read_text().splitlines() if line.strip()]
+    else:
+        ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+
+    if not ticker_list:
+        console.print("[red]No tickers provided.[/red]")
+        raise typer.Exit(1)
+
+    analysis_date = date or dt.date.today().strftime("%Y-%m-%d")
+    report_dir = output_dir or str(Path(DEFAULT_CONFIG["results_dir"]) / "batch" / analysis_date)
+
+    console.print(f"[bold]Batch analysis: {len(ticker_list)} tickers on {analysis_date}[/bold]")
+    console.print(f"Tickers: {', '.join(ticker_list)}")
+    console.print(f"Concurrency: {concurrency}")
+    console.print(f"Output: {report_dir}\n")
+
+    config = DEFAULT_CONFIG.copy()
+    results = run_batch_sync(ticker_list, analysis_date, config, max_concurrency=concurrency, output_dir=report_dir)
+
+    # Print summary
+    summary = generate_summary_report(results)
+    console.print(Markdown(summary))
+
+    # Save summary
+    summary_path = Path(report_dir) / "batch_summary.md"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(summary, encoding="utf-8")
+    console.print(f"\n[green]Summary saved to {summary_path}[/green]")
 
 
 if __name__ == "__main__":

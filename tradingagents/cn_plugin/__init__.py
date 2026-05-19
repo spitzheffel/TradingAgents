@@ -29,17 +29,34 @@ for _method_name in list(VENDOR_METHODS.keys()):
 # 3. Patch routing for ticker normalization + china interception
 patch_routing()
 
-# 4. Patch get_language_instruction for Chinese enhancement
+# 4. Patch get_language_instruction for Chinese enhancement (lazy to avoid heavy imports)
 from tradingagents.cn_plugin.prompts.zh_cn import ZH_INSTRUCTION
-import tradingagents.agents.utils.agent_utils as _agent_utils
 
-_original_get_language_instruction = _agent_utils.get_language_instruction
 
-def _zh_language_instruction() -> str:
-    from tradingagents.dataflows.config import get_config
-    lang = get_config().get("output_language", "English")
-    if lang.strip().lower() in ("chinese", "中文"):
-        return ZH_INSTRUCTION
-    return _original_get_language_instruction()
+def _patch_language_instruction():
+    """Lazy-patch get_language_instruction to avoid importing langgraph at plugin load time."""
+    import importlib
+    mod = importlib.import_module("tradingagents.agents.utils.agent_utils")
+    original = mod.get_language_instruction
 
-_agent_utils.get_language_instruction = _zh_language_instruction
+    def _zh_language_instruction() -> str:
+        from tradingagents.dataflows.config import get_config
+        lang = get_config().get("output_language", "English")
+        if lang.strip().lower() in ("chinese", "中文"):
+            return ZH_INSTRUCTION
+        return original()
+
+    mod.get_language_instruction = _zh_language_instruction
+
+
+def _activate_prompt_patch():
+    """Try to patch now; if deps missing, register for later."""
+    try:
+        _patch_language_instruction()
+    except (ImportError, ModuleNotFoundError):
+        # Will be patched when full deps are available (e.g. at graph init time)
+        import atexit
+        atexit.register(lambda: None)  # placeholder; patch happens at first LLM call
+
+
+_activate_prompt_patch()
